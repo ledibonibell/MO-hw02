@@ -1,16 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+L = 10
+
+
 def fitness_function(x, y):
-    return np.sin(x) * np.cos(y) / (1 + x**2 + y**2)
+    return np.sin(x) * np.cos(y) / (1 + x ** 2 + y ** 2)
+
 
 def initialize_population(population_size):
     population = []
     for _ in range(population_size):
-        x = np.random.uniform(0, 2)
-        y = np.random.uniform(-2, 2)
+        x_binary = ''.join(np.random.choice(['0', '1']) for _ in range(L))
+        y_binary = ''.join(np.random.choice(['0', '1']) for _ in range(L))
+
+        x = int(x_binary, 2) / (2 ** L - 1)
+        y = -2 + int(y_binary, 2) / (2 ** L - 1) * 4
+
         population.append((x, y))
     return population
+
 
 def roulette_selection(population, fitness_values):
     total_fitness = sum(fitness_values)
@@ -19,20 +28,39 @@ def roulette_selection(population, fitness_values):
     selected_index = np.random.choice(len(population), p=probabilities)
     return population[selected_index]
 
-def ordered_crossover(parent1, parent2):
-    alpha = np.random.rand()
-    x_child = alpha * parent1[0] + (1 - alpha) * parent2[0]
-    y_child = alpha * parent1[1] + (1 - alpha) * parent2[1]
-    return (x_child, y_child)
+
+def two_point_crossover(parent1, parent2):
+    point1 = np.random.randint(1, L)
+    point2 = np.random.randint(point1, L)
+
+    x_binary_parent1 = bin(int((parent1[0] * (2 ** L - 1)) + 0.5))[2:].zfill(L)
+    x_binary_parent2 = bin(int((parent2[0] * (2 ** L - 1)) + 0.5))[2:].zfill(L)
+    y_binary_parent1 = bin(int(((parent1[1] + 2) / 4) * (2 ** L - 1) + 0.5))[2:].zfill(L)
+    y_binary_parent2 = bin(int(((parent2[1] + 2) / 4) * (2 ** L - 1) + 0.5))[2:].zfill(L)
+
+    x_child = int(x_binary_parent1[:point1] + x_binary_parent2[point1:point2] + x_binary_parent1[point2:], 2) / (2 ** L - 1)
+    y_child = -2 + int(y_binary_parent1[:point1] + y_binary_parent2[point1:point2] + y_binary_parent1[point2:], 2) / (2 ** L - 1) * 4
+
+    return x_child, y_child
+
 
 def mutation(child, mutation_rate):
+    x_binary = bin(int((child[0] * (2 ** L - 1)) + 0.5))[2:].zfill(L)
+    y_binary = bin(int(((child[1] + 2) / 4) * (2 ** L - 1) + 0.5))[2:].zfill(L)
+
     if np.random.rand() < mutation_rate:
-        gene_to_mutate = np.random.choice([0, 1])
-        if gene_to_mutate == 0:
-            child = (child[0] + np.random.uniform(-0.1, 0.1), child[1])
-        else:
-            child = (child[0], child[1] + np.random.uniform(-0.1, 0.1))
+        mutated_bit_x = np.random.randint(L)
+        x_binary = x_binary[:mutated_bit_x] + ('0' if x_binary[mutated_bit_x] == '1' else '1') + x_binary[
+                                                                                                 mutated_bit_x + 1:]
+
+    if np.random.rand() < mutation_rate:
+        mutated_bit_y = np.random.randint(L)
+        y_binary = y_binary[:mutated_bit_y] + ('0' if y_binary[mutated_bit_y] == '1' else '1') + y_binary[
+                                                                                                 mutated_bit_y + 1:]
+
+    child = (int(x_binary, 2) / (2 ** L - 1), -2 + int(y_binary, 2) / (2 ** L - 1) * 4)
     return child
+
 
 def plot_3d_surface():
     fig = plt.figure()
@@ -62,6 +90,7 @@ def plot_average_fitness(generation_values, average_fitness_values):
     plt.legend()
     plt.savefig('average - fitness.png')
 
+
 def plot_population_values(generation, x_values, y_values):
     plt.figure()
     plt.scatter(x_values, y_values, marker='o', label='Population Values')
@@ -76,6 +105,7 @@ def plot_population_values(generation, x_values, y_values):
     plt.legend()
     plt.grid(True)
     plt.savefig(f'population - values - {generation}.png')
+
 
 def genetic_algorithm(population_size, generations, populations_to_display):
     population = initialize_population(population_size)
@@ -119,16 +149,17 @@ def genetic_algorithm(population_size, generations, populations_to_display):
         for i in range(0, population_size, 2):
             parent1 = parents[i]
             parent2 = parents[i + 1]
-            child1 = ordered_crossover(parent1, parent2)
-            child2 = ordered_crossover(parent2, parent1)
+            child1 = two_point_crossover(parent1, parent2)
+            child2 = two_point_crossover(parent2, parent1)
             children.extend([mutation(child1, 0.25), mutation(child2, 0.25)])
 
         population = children
 
-    print(f"\nOverall Best Solution: ({round(best_overall_individual[0], 4)}, {round(best_overall_individual[1], 4)}), Overall Best Fitness: {round(best_overall_fitness, 4)}")
-
+    print(
+        f"\nOverall Best Solution: ({round(best_overall_individual[0], 4)}, {round(best_overall_individual[1], 4)}), Overall Best Fitness: {round(best_overall_fitness, 4)}")
 
     plot_average_fitness(range(generations), average_fitness_values)
     plot_3d_surface()
+
 
 genetic_algorithm(population_size=4, generations=100, populations_to_display=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
